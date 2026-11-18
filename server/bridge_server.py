@@ -427,7 +427,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         return 0
     except ConfigError as exc:
-        print(f"需要你的操作：{exc}", file=sys.stderr, flush=True)
+        print(f"未启动：{exc}", file=sys.stderr, flush=True)
         return 2
     except Exception as exc:
         print(f"启动失败：{exc}", file=sys.stderr, flush=True)

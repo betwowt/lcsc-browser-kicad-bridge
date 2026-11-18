@@ -1,62 +1,69 @@
-LCSC KiCad Bridge（浏览器扩展 + 本地服务）
-========================================
+LCSC KiCad Bridge 使用说明
+=========================
 
-作用：在立创商城（szlcsc.com / lcsc.com）商品页或搜索结果页点「导入」，把符号、封装和 3D 模型
-写入你的 KiCad 工程目录（LCSC/ 子目录，并在 sym-lib-table / fp-lib-table 登记 LCSC 库）。
-
-本工具基于 LCSC_Kicad_import（立创元件桥 KiCad 插件）的转换核心：
-  https://github.com/silencewwh/LCSC_Kicad_import
-其 EasyEDA 转换器来自 uPesy/easyeda2kicad.py（AGPL-3.0），导入器原型来自
-Steffen-W/Import-LIB-KiCad-Plugin（GPL-3.0）。详见仓库 THIRD_PARTY_NOTICES.md。
-
-文件
+作用
 ----
-  LCSC-KiCad-Bridge.exe       Windows 本地服务
-  LCSC-KiCad-Bridge           macOS / Linux 本地服务
-  extension\                  浏览器扩展（Chrome / Edge）
+在立创商城（szlcsc.com / lcsc.com / lcsc.cn）的商品页或搜索结果页点「导入」，把符号、封装和 3D 模型
+写进你的 KiCad 工程：<工程>/LCSC/ 下生成库文件，同时在 sym-lib-table、fp-lib-table 登记一个 LCSC 库。
 
-安装扩展（三平台相同）
-----------------------
-  A. 已上架：从 Edge 加载项 / Chrome 应用商店搜索安装（免开发者模式）。
-  B. 未上架：edge://extensions 或 chrome://extensions → 开发者模式 →
-     「加载已解压的扩展程序」→ 选择 extension 文件夹。
+转换部分来自 LCSC_Kicad_import（https://github.com/silencewwh/LCSC_Kicad_import），本工具只加了
+浏览器扩展和本机服务，源码与署名见仓库的 README 和 THIRD_PARTY_NOTICES.md。
 
-启动服务
+压缩包内容
+----------
+  LCSC-KiCad-Bridge.exe     Windows 下的本地服务
+  LCSC-KiCad-Bridge         macOS / Linux 下的本地服务
+  extension/                浏览器扩展（Chrome / Edge）
+
+安装扩展
 --------
+两种方式选一种：
+  1. 已上架：在 Edge 加载项或 Chrome 应用商店搜索安装，不需要开发者模式。
+  2. 未上架：打开 edge://extensions 或 chrome://extensions，启用开发者模式，
+     选择「加载已解压的扩展程序」，指向 extension 文件夹。
+
+启动本地服务
+------------
 Windows：
-  双击 LCSC-KiCad-Bridge.exe，首次弹出窗口选择含 .kicad_pro 的工程目录，端口默认 8737。
+  双击 LCSC-KiCad-Bridge.exe。首次运行弹出窗口，选择包含 .kicad_pro 的工程目录，端口默认 8737。
   配置保存在 %LOCALAPPDATA%\LCSCKiCadBridge\config.json。
-macOS：
+
+macOS（二进制未签名，先解除隔离）：
   xattr -dr com.apple.quarantine LCSC-KiCad-Bridge
-  chmod +x LCSC-KiCad-Bridge && ./LCSC-KiCad-Bridge
+  chmod +x LCSC-KiCad-Bridge
+  ./LCSC-KiCad-Bridge
   配置保存在 ~/Library/Application Support/LCSCKiCadBridge/config.json。
+
 Linux：
-  chmod +x LCSC-KiCad-Bridge && ./LCSC-KiCad-Bridge
-  无图形环境或不装 python3-tk 时用 --project 直接指定工程目录。
+  chmod +x LCSC-KiCad-Bridge
+  ./LCSC-KiCad-Bridge
+  需要图形选择窗口时先装 python3-tk；没有桌面环境就用 --project 指定工程目录。
   配置保存在 ${XDG_CONFIG_HOME:-~/.config}/LCSCKiCadBridge/config.json。
 
-看到 “listening on http://127.0.0.1:8737” 后保持窗口开启；关闭窗口即停止服务。
-打开扩展的“扩展选项”点“测试连接”，应显示工程目录且 token_required: false（默认免配对）。
+看到 “listening on http://127.0.0.1:8737” 后保持窗口开启，关掉窗口服务就停了。然后打开扩展选项，
+点「测试连接」，应显示工程路径和 token_required: false（默认不校验 token）。
 
 使用
 ----
   商品详情页：右下角「导入 KiCad」。
-  搜索结果页：每张结果卡片右侧「导入」。
+  搜索结果页：每张结果卡片右侧的「导入」。
   其他页面：点工具栏扩展图标，手动输入料号或粘贴商品页链接。
-  回到 KiCad：库列表选择 LCSC 库（已打开的工程请重开编辑器刷新库表）。
+  回到 KiCad：库列表里选 LCSC 库。已经打开的编辑器要重开一次才能看到新库表。
 
 常用命令
 --------
   LCSC-KiCad-Bridge                    启动服务
-  LCSC-KiCad-Bridge --setup            重新选择工程目录 / 端口
+  LCSC-KiCad-Bridge --setup            重新选择工程目录和端口
   LCSC-KiCad-Bridge --check            只检查配置与转换器
   LCSC-KiCad-Bridge --import C1688     不开浏览器，直接导入一个料号
   LCSC-KiCad-Bridge --project <目录>   临时指定工程目录
   LCSC-KiCad-Bridge --config <文件>    指定配置文件
 
-说明与限制
-----------
-- 只监听 127.0.0.1；/import 仅接受浏览器扩展（或本地无 Origin 调用），网页无法直接调用。
-- 需要联网：符号/封装/3D 来自 EasyEDA，STEP 支持分段并行下载。
-- 浏览器不允许免开发者模式安装未上架扩展；分发给别人请上架 Edge 加载项（免费）或 Chrome 应用商店。
-- 端口被占用时用 --setup 换端口，扩展选项里的 endpoint 改成同一端口。
+限制
+----
+- 服务只监听 127.0.0.1；/import 只接受浏览器扩展（或没有 Origin 的本地调用），网页里的脚本改不了 Origin，
+  调不到这个接口。
+- 需要联网：符号、封装和 3D 模型来自 EasyEDA，STEP 文件支持分段并行下载。
+- 浏览器要求开启开发者模式才能安装未上架扩展。要免开发者模式，需要把扩展上架，Edge 加载项免费，
+  Chrome 应用商店一次性 5 美元，两个渠道用的是同一份 extension-store.zip。
+- 端口被占用时用 --setup 换端口，扩展选项里的 endpoint 改成同一个端口。

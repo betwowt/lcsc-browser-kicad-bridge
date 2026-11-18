@@ -1,7 +1,7 @@
 # Third-party notices
 
 This repository is a browser front end and loopback service around existing open-source conversion
-code. It adapts none of it: the converter sources are pulled in as a pinned git submodule.
+code. The converter sources are pulled in as a pinned git submodule and are not copied or modified.
 
 ## LCSC_Kicad_import
 
