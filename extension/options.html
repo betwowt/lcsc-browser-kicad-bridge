@@ -25,8 +25,10 @@
     <label for="token">令牌（可选）</label>
     <input id="token" name="token" type="password" autocomplete="off" spellcheck="false">
     <p class="hint">本机服务默认不校验令牌，留空即可。仅当 config.json 的 token 非空时才填写；前后空格与引号会自动去掉。</p>
+    <p class="hint">当前工程：<code id="project">未连接</code></p>
     <button id="save" type="submit">保存</button>
     <button id="test" type="button">测试连接</button>
+    <button id="open-settings" type="button">打开工程设置</button>
     <div id="status" role="status" aria-live="polite"></div>
   </form>
 </body>

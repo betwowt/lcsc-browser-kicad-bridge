@@ -5,6 +5,8 @@ const form = document.getElementById("settings");
 const endpointInput = document.getElementById("endpoint");
 const tokenInput = document.getElementById("token");
 const statusLine = document.getElementById("status");
+const projectLine = document.getElementById("project");
+const openSettings = document.getElementById("open-settings");
 const saveButton = document.getElementById("save");
 const testButton = document.getElementById("test");
 
@@ -69,12 +71,32 @@ testButton.addEventListener("click", async () => {
   }
 });
 
+async function refreshProject() {
+  try {
+    const response = await chrome.runtime.sendMessage({type: "health"});
+    projectLine.textContent = response?.ok ? response.project_dir : "未连接";
+  } catch {
+    projectLine.textContent = "未连接";
+  }
+}
+
+async function openProjectSettings() {
+  try {
+    await saveSettings();
+    const settings = await chrome.storage.local.get({endpoint: DEFAULT_ENDPOINT});
+    await chrome.tabs.create({url: `${settings.endpoint}/settings`});
+  } catch (error) {
+    statusLine.textContent = errorText(error);
+  }
+}
+
 async function loadSettings() {
   setBusy(true);
   try {
     const settings = await chrome.storage.local.get({endpoint: DEFAULT_ENDPOINT, token: ""});
     endpointInput.value = settings.endpoint;
     tokenInput.value = settings.token;
+    refreshProject();
   } catch (error) {
     statusLine.textContent = errorText(error);
   } finally {
@@ -82,4 +104,5 @@ async function loadSettings() {
   }
 }
 
+openSettings.addEventListener("click", openProjectSettings);
 loadSettings();
