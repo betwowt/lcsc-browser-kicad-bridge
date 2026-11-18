@@ -6,7 +6,6 @@ const endpointInput = document.getElementById("endpoint");
 const tokenInput = document.getElementById("token");
 const statusLine = document.getElementById("status");
 const projectLine = document.getElementById("project");
-const openSettings = document.getElementById("open-settings");
 const saveButton = document.getElementById("save");
 const testButton = document.getElementById("test");
 
@@ -80,16 +79,6 @@ async function refreshProject() {
   }
 }
 
-async function openProjectSettings() {
-  try {
-    await saveSettings();
-    const settings = await chrome.storage.local.get({endpoint: DEFAULT_ENDPOINT});
-    await chrome.tabs.create({url: `${settings.endpoint}/settings`});
-  } catch (error) {
-    statusLine.textContent = errorText(error);
-  }
-}
-
 async function loadSettings() {
   setBusy(true);
   try {
@@ -104,5 +93,4 @@ async function loadSettings() {
   }
 }
 
-openSettings.addEventListener("click", openProjectSettings);
 loadSettings();

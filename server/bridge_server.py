@@ -24,79 +24,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 MAX_BODY_BYTES = 8192
 FROZEN = bool(getattr(sys, "frozen", False))
 APP_DIR_NAME = "LCSCKiCadBridge"
 IMPORT_LOCK = threading.Lock()
-DIALOG_LOCK = threading.Lock()
 Importer = Callable[[str, str, list[str]], Any]
 ORIGIN_RE = re.compile(r"(?:chrome|edge)-extension://[A-Za-z0-9_-]{1,64}")
 ID_RE = re.compile(r"C[1-9][0-9]{0,30}")
-
-
-SETTINGS_PAGE = """<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>LCSC → KiCad 设置</title>
-<style>
-body{max-width:640px;margin:40px auto;padding:0 20px;font:15px/1.6 system-ui,sans-serif;color:#1f2937}
-h1{font-size:20px;margin:0 0 20px}
-code{background:#eef2f7;padding:2px 6px;border-radius:4px}
-.row{display:flex;gap:8px;align-items:center;margin:10px 0}
-input{flex:1;padding:8px 10px;border:1px solid #94a3b8;border-radius:6px;font:inherit}
-button{padding:8px 14px;border:0;border-radius:6px;background:#0759b5;color:#fff;font:inherit;cursor:pointer}
-button.secondary{background:#e2e8f0;color:#1f2937}
-#status{color:#475569}
-.hint{color:#64748b;font-size:13px}
-</style></head>
-<body>
-<h1>LCSC → KiCad</h1>
-<p>当前工程：<code id="current">读取中…</code></p>
-<p><label for="path">工程目录</label></p>
-<div class="row">
-  <input id="path" spellcheck="false" placeholder="D:/work/demo">
-  <button id="pick" class="secondary" type="button">选择文件夹</button>
-</div>
-<div class="row">
-  <button id="save" type="button">保存</button>
-  <span id="status" role="status"></span>
-</div>
-<p class="hint">保存后立即生效，不需要重启服务。目录里要有 .kicad_pro；已经打开的 KiCad 编辑器要重开一次才能看到新库表。</p>
-<script>
-const $ = (id) => document.getElementById(id);
-async function call(path, options) {
-  const response = await fetch(path, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) throw new Error(data.error || "HTTP " + response.status);
-  return data;
-}
-async function refresh() {
-  try {
-    const data = await call("/health");
-    $("current").textContent = data.project_dir;
-    if (!$("path").value) $("path").value = data.project_dir;
-  } catch (error) { $("status").textContent = error.message; }
-}
-$("pick").onclick = async () => {
-  $("status").textContent = "等待选择…";
-  try {
-    const data = await call("/api/pick-folder", {method: "POST"});
-    $("status").textContent = "";
-    if (data.path) $("path").value = data.path;
-  } catch (error) { $("status").textContent = error.message; }
-};
-$("save").onclick = async () => {
-  try {
-    const data = await call("/api/config", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({project_dir: $("path").value.trim()}),
-    });
-    $("current").textContent = data.project_dir;
-    $("status").textContent = data.has_project ? "已保存" : "已保存，但该目录没有 .kicad_pro";
-  } catch (error) { $("status").textContent = error.message; }
-};
-refresh();
-</script>
-</body></html>"""
 
 
 class ConfigError(Exception):
@@ -196,6 +131,68 @@ def _ask_port(default: int) -> int:
     finally:
         root.destroy()
     return int(value or default)
+
+
+def save_project_dir(config_path: Path | None, config: dict[str, Any], value: str) -> dict[str, Any]:
+    """Validate, apply and persist a project directory; returns path and .kicad_pro state."""
+    directory = Path(value).expanduser()
+    if not directory.is_dir():
+        raise ValueError(f"目录不存在：{directory}")
+    directory = directory.resolve()
+    config["project_dir"] = str(directory)
+    if config_path is not None:
+        data: dict[str, Any] = {}
+        try:
+            loaded = json.loads(config_path.read_text(encoding="utf-8-sig"))
+            if isinstance(loaded, dict):
+                data = loaded
+        except (OSError, ValueError):
+            pass
+        data.update({
+            "port": config["port"],
+            "project_dir": directory.as_posix(),
+            "token": config["token"],
+            "kicad_import_dir": config["kicad_import_dir"],
+        })
+        temporary = config_path.with_name(config_path.name + ".tmp")
+        temporary.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8", newline="\n",
+        )
+        os.replace(temporary, config_path)
+    return {"project_dir": directory.as_posix(), "has_project": any(directory.glob("*.kicad_pro"))}
+
+
+def project_prompt(current: str) -> str | None:
+    """Ask whether to reuse the configured project; None means the window was closed."""
+    tk = _tkinter()
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.title("LCSC → KiCad")
+    root.resizable(False, False)
+    chosen: list[str] = []
+    tk.Label(root, text="当前 KiCad 工程", anchor="w").pack(fill="x", padx=16, pady=(14, 2))
+    tk.Label(root, text=current, anchor="w", justify="left", wraplength=460,
+             fg="#0759b5").pack(fill="x", padx=16)
+    buttons = tk.Frame(root)
+    buttons.pack(fill="x", padx=16, pady=14)
+
+    def keep() -> None:
+        chosen.append(current)
+        root.destroy()
+
+    def change() -> None:
+        folder = filedialog.askdirectory(parent=root, title="选择 KiCad 工程目录", mustexist=True)
+        if folder:
+            chosen.append(folder)
+            root.destroy()
+
+    tk.Button(buttons, text="继续使用", width=12, command=keep).pack(side="left")
+    tk.Button(buttons, text="更改目录…", width=12, command=change).pack(side="left", padx=(8, 0))
+    root.protocol("WM_DELETE_WINDOW", root.destroy)
+    root.mainloop()
+    return chosen[0] if chosen else None
 
 
 def wizard(path: Path, port: int | None = None) -> dict[str, Any]:
@@ -385,69 +382,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    def _caller_is_local_page(self) -> bool:
-        """Same-origin pages served by this service, extensions, or local tools."""
-        origin = self.headers.get("Origin")
-        if origin is None or ORIGIN_RE.fullmatch(origin):
-            return True
-        port = self.server.server_port
-        return origin in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
-
-    def _project_info(self) -> dict[str, Any]:
-        directory = Path(self.server.config["project_dir"])
-        has_project = any(directory.glob("*.kicad_pro"))
-        return {"project_dir": directory.as_posix(), "has_project": has_project}
-
-    def _save_project_dir(self, value: Any) -> dict[str, Any]:
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("请填写工程目录。")
-        directory = Path(value.strip()).expanduser()
-        if not directory.is_dir():
-            raise ValueError(f"目录不存在：{directory}")
-        directory = directory.resolve()
-        self.server.config["project_dir"] = str(directory)
-        config_path = self.server.config_path
-        if config_path is not None:
-            data: dict[str, Any] = {}
-            try:
-                loaded = json.loads(config_path.read_text(encoding="utf-8-sig"))
-                if isinstance(loaded, dict):
-                    data = loaded
-            except (OSError, ValueError):
-                pass
-            data.update({
-                "port": self.server.config["port"],
-                "project_dir": directory.as_posix(),
-                "token": self.server.config["token"],
-                "kicad_import_dir": self.server.config["kicad_import_dir"],
-            })
-            temporary = config_path.with_name(config_path.name + ".tmp")
-            temporary.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8", newline="\n",
-            )
-            os.replace(temporary, config_path)
-        return self._project_info()
-
-    def _pick_folder(self) -> str:
-        if not DIALOG_LOCK.acquire(blocking=False):
-            raise RuntimeError("另一个选择窗口还开着。")
-        try:
-            return _ask_folder("选择 KiCad 工程目录")
-        finally:
-            DIALOG_LOCK.release()
-
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
-        if path in ("/", "/settings"):
-            body = SETTINGS_PAGE.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
-            return
         if path != "/health":
             self._error(404, "Endpoint not found.")
             return
@@ -460,25 +396,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path in ("/api/config", "/api/pick-folder"):
-            if not self._caller_is_local_page():
-                self._error(401, "Only the local settings page or the extension may change settings.")
-                return
-            try:
-                if path == "/api/pick-folder":
-                    folder = self._pick_folder()
-                    if not folder:
-                        self._error(400, "没有选择文件夹。")
-                        return
-                    self._json(200, {"ok": True, "path": Path(folder).as_posix()})
-                    return
-                body = self._body()
-                self._json(200, {"ok": True, **self._save_project_dir(body.get("project_dir"))})
-            except (ValueError, UnicodeError, OSError) as exc:
-                self._error(400, str(exc) or type(exc).__name__)
-            except Exception as exc:
-                self._error(500, str(exc) or type(exc).__name__)
-            return
         if path != "/import":
             self._error(404, "Endpoint not found.")
             return
@@ -553,6 +470,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--setup", action="store_true", help="re-run the first-run wizard")
     parser.add_argument("--check", action="store_true", help="validate config and converter, then exit")
     parser.add_argument("--import", dest="lcsc_id", metavar="C2040", help="convert one part and exit")
+    parser.add_argument("--no-prompt", action="store_true",
+                        help="start with the configured project without asking")
     args = parser.parse_args(argv)
     try:
         if args.setup:
@@ -566,11 +485,21 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.lcsc_id:
             return run_import(config, args.lcsc_id)
+        if not args.no_prompt and _interactive():
+            chosen = project_prompt(config["project_dir"])
+            if chosen is None:
+                print("已关闭启动窗口，服务未启动。", flush=True)
+                return 0
+            try:
+                info = save_project_dir(args.config, config, chosen)
+            except (OSError, ValueError) as exc:
+                print(f"未启动：{exc}", file=sys.stderr, flush=True)
+                return 2
+            config["project_dir"] = info["project_dir"]
         importer = LazyImporter(config)
         with build_server(config, importer=importer, config_path=args.config) as server:
             print(f"listening on http://127.0.0.1:{server.server_port}", flush=True)
             print(f"工程目录：{config['project_dir']}", flush=True)
-            print(f"切换工程：http://127.0.0.1:{server.server_port}/settings", flush=True)
             print("保持此窗口开启；关闭窗口即停止服务。Ctrl-C 退出。", flush=True)
             try:
                 server.serve_forever(poll_interval=0.25)
