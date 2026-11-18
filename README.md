@@ -1,7 +1,6 @@
 # LCSC → KiCad
 
 在浏览器里逛立创商城，点一下页面上的「导入」，符号、封装和 3D 模型就写进你的 KiCad 工程。
-不用装 KiCad 插件，也不用 KiCad 自带的 Python 环境。
 
 ![搜索结果页里的导入按钮](docs/images/search-page.png)
 
