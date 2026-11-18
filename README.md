@@ -6,7 +6,7 @@
 
 ## 用法
 
-**1. 下载**：在 [Releases](https://github.com/betwowt/lcsc-browser-bridge/releases) 里选对应平台，解压。
+**1. 下载**：在 [Releases](https://github.com/betwowt/lcsc-browser-kicad-bridge/releases) 里选对应平台，解压。
 
 **2. 启动本地服务**：首次运行会让你选 KiCad 工程目录（包含 `.kicad_pro` 的那个）。
 
@@ -39,7 +39,7 @@ chmod +x LCSC-KiCad-Bridge && ./LCSC-KiCad-Bridge                        # Linux
 ## 开发与发版
 
 ```bash
-git clone --recurse-submodules git@github.com:betwowt/lcsc-browser-bridge.git
+git clone --recurse-submodules git@github.com:betwowt/lcsc-browser-kicad-bridge.git
 cp server/config.example.json server/config.json   # 填 project_dir
 python server/bridge_server.py --config server/config.json
 ```
