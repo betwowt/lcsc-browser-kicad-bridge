@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LCSC → KiCad Bridge 设置</title>
+  <style>
+    body { max-width: 640px; margin: 48px auto; padding: 0 24px; font: 16px/1.6 system-ui, sans-serif; color: #172033; background: #f5f7fb; }
+    h1 { font-size: 24px; }
+    form { padding: 24px; background: white; border: 1px solid #cbd5e1; border-radius: 12px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; }
+    input { box-sizing: border-box; width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #64748b; border-radius: 5px; font: inherit; }
+    button { margin: 0 8px 8px 0; padding: 9px 18px; border: 0; border-radius: 5px; background: #0759b5; color: white; font: inherit; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    #status { min-height: 2em; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .hint { color: #475569; font-size: 14px; }
+  </style>
+  <script src="options.js" defer></script>
+</head>
+<body>
+  <h1>LCSC → KiCad Bridge 设置</h1>
+  <form id="settings">
+    <label for="endpoint">本地服务地址（endpoint）</label>
+    <input id="endpoint" name="endpoint" type="url" required placeholder="http://127.0.0.1:8737" spellcheck="false">
+    <label for="token">令牌（可选）</label>
+    <input id="token" name="token" type="password" autocomplete="off" spellcheck="false">
+    <p class="hint">本机服务默认不校验令牌，留空即可。仅当 config.json 的 token 非空时才填写；前后空格与引号会自动去掉。</p>
+    <button id="save" type="submit">保存</button>
+    <button id="test" type="button">测试连接</button>
+    <div id="status" role="status" aria-live="polite"></div>
+  </form>
+</body>
+</html>

@@ -1,0 +1,3 @@
+[submodule "vendor/LCSC_Kicad_import"]
+	path = vendor/LCSC_Kicad_import
+	url = https://github.com/silencewwh/LCSC_Kicad_import.git

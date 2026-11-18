@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags: ['bridge-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.slug }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            slug: windows-x64
+          - os: macos-latest
+            slug: macos-arm64
+          - os: ubuntu-latest
+            slug: linux-x64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout with converter submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python (Windows / macOS)
+        if: runner.os != 'Linux'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Ubuntu builds use the system interpreter so the Tk wizard is bundled.
+      - name: Set up Python with Tk (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-tk python3-pip
+          python3 -c "import tkinter; print('tkinter', tkinter.TkVersion)"
+          echo "PYTHON=python3" >> "$GITHUB_ENV"
+          echo "PIP_FLAGS=--break-system-packages" >> "$GITHUB_ENV"
+
+      - name: Set up Python (default)
+        if: runner.os != 'Linux'
+        run: echo "PYTHON=python" >> "$GITHUB_ENV"
+
+      - name: Verify Tk is available
+        run: |
+          "$PYTHON" -c "import tkinter; print('tk', tkinter.TkVersion)"
+
+      - name: Static checks
+        run: |
+          "$PYTHON" -m py_compile server/bridge_server.py
+          for file in extension/*.js; do node --check "$file"; done
+
+      - name: Install PyInstaller
+        run: |
+          "$PYTHON" -m pip install $PIP_FLAGS --upgrade pip pyinstaller
+
+      - name: Build portable binary and zip
+        run: |
+          "$PYTHON" tools/build_portable.py
+
+      - name: Smoke-test the binary
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then BIN=dist/LCSC-KiCad-Bridge.exe; else BIN=dist/LCSC-KiCad-Bridge; fi
+          "$BIN" --help > /dev/null
+
+      - name: Upload platform archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-${{ matrix.slug }}
+          path: dist/LCSC-KiCad-Bridge-*-*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/bridge-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout for the extension archive
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build store-ready extension zip
+        run: python tools/build_portable.py --skip-exe
+
+      - name: Collect platform archives
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Copy extension archive next to the binaries
+        run: cp dist/extension-store.zip artifacts/
+
+      - name: Write checksums
+        run: cd artifacts && sha256sum * > SHA256SUMS.txt
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: LCSC KiCad Browser Bridge ${{ github.ref_name }}
+          files: artifacts/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
