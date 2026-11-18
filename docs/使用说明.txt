@@ -41,7 +41,7 @@ Linux：
   配置保存在 ${XDG_CONFIG_HOME:-~/.config}/LCSCKiCadBridge/config.json。
 
 看到 “listening on http://127.0.0.1:8737” 后保持窗口开启，关掉窗口服务就停了。然后打开扩展选项，
-点「测试连接」，应显示工程路径和 token_required: false（默认不校验 token）。
+点「测试连接」，应显示当前工程路径。
 
 使用
 ----
