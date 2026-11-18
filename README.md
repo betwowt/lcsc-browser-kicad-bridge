@@ -73,6 +73,10 @@ chmod +x LCSC-KiCad-Bridge
 | 搜索结果页，如 `https://so.szlcsc.com/global.html?k=…` | 卡片「编号」行，同时与卡片 `data-custom-data.productCode` 比对，不一致就不插按钮 |
 | 其他页面 | 点扩展图标，手动输入料号或粘贴商品页链接 |
 
+搜索结果页上，按钮出现在每张卡片「加入购物车」的下面，鼠标悬停会显示要导入的料号：
+
+![搜索结果页里的导入按钮](docs/images/search-page.png)
+
 ## 命令行
 
 ```text
